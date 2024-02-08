@@ -13,6 +13,9 @@ type Expense struct {
 	ExpenseType    string             `bson:"type" json:"type" validate:"required"`
 	ExpenseSubType string             `bson:"subType" json:"subType" validate:"required"`
 	CreatedDate    time.Time          `bson:"createdDate" json:"createdDate"`
+	ExpenseDate    time.Time          `bson:"expenseDate" json:"expenseDate"`
+	Description    string             `bson:"description" json:"description"`
+	Source         string             `bson:"source" json:"source" validate:"required"`
 }
 
 func SetNewExpenseId(expense *Expense) Expense {

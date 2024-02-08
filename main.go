@@ -5,11 +5,15 @@ import (
 	"alok/web-service-budget/routes"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
 
 	e := echo.New()
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+	}))
 
 	routes.UserRoute(e)
 	routes.ExpenseRoute(e)
