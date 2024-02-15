@@ -14,7 +14,7 @@ type Expense struct {
 	ExpenseSubType string             `bson:"subType" json:"subType" validate:"required"`
 	CreatedDate    time.Time          `bson:"createdDate" json:"createdDate"`
 	ExpenseDate    time.Time          `bson:"expenseDate" json:"expenseDate"`
-	Description    string             `bson:"description" json:"description"`
+	Description    string             `bson:"description" json:"description" validate:"required"`
 	Source         string             `bson:"source" json:"source" validate:"required"`
 }
 
