@@ -115,7 +115,21 @@ func DeleteExpense(c echo.Context) error {
 func GetExpenseGroupByDate(c echo.Context) error {
 	userIDsString := c.QueryParam("userids")
 	numMonthsString := c.QueryParam("numMonths")
+	groupType := c.QueryParam("groupType")
 
+	if groupType == "" {
+		return handleResponse(c, &echo.Map{"data": nil}, "userIds or groupType are empty", http.StatusBadRequest)
+	}
+
+	if groupType == "date" {
+		groupType = "expenseDate"
+	} else if groupType == "mode" {
+		groupType = "source"
+	} else {
+		groupType = "type"
+	}
+
+	// groupField := "$" + groupType
 	// Check if userIDsString is empty
 	// Convert numMonthsString to an integer
 	numMonths, shouldReturn, returnValue := validateRequest(userIDsString, c, numMonthsString)
@@ -128,9 +142,6 @@ func GetExpenseGroupByDate(c echo.Context) error {
 	for i, userID := range userIDs {
 		userIDs[i] = strings.TrimSpace(userID)
 	}
-
-	// Print user IDs (for demonstration)
-	fmt.Println("User IDs:", userIDs)
 
 	currentDate := time.Now()
 	currentMonth := currentDate.Month()
@@ -151,6 +162,18 @@ func GetExpenseGroupByDate(c echo.Context) error {
 		},
 	}
 
+	// Define the group field based on the groupType parameter
+	var groupField interface{}
+	switch groupType {
+	case "expenseDate":
+		groupField = bson.D{{Key: "$dateToString", Value: bson.D{
+			{Key: "format", Value: "%Y-%m-%d"},
+			{Key: "date", Value: "$expenseDate"},
+		}}}
+	default:
+		groupField = "$" + groupType
+	}
+
 	// MongoDB aggregation pipeline to group by date and sum amount
 	pipeline := mongo.Pipeline{
 		bson.D{
@@ -158,7 +181,7 @@ func GetExpenseGroupByDate(c echo.Context) error {
 		},
 		bson.D{
 			{Key: "$group", Value: bson.D{
-				{Key: "_id", Value: "$expenseDate"},
+				{Key: "_id", Value: groupField},
 				{Key: "totalAmount", Value: bson.D{
 					{Key: "$sum", Value: "$amount"},
 				}},
@@ -174,17 +197,17 @@ func GetExpenseGroupByDate(c echo.Context) error {
 	defer cursor.Close(context.Background())
 
 	// Iterate through the cursor and store results
-	results := make(map[time.Time]float64)
+	results := make(map[string]float64)
 
 	for cursor.Next(context.Background()) {
 		var result struct {
-			Date        time.Time `bson:"_id"`
-			TotalAmount float64   `bson:"totalAmount"`
+			Type        string  `bson:"_id"`
+			TotalAmount float64 `bson:"totalAmount"`
 		}
 		if err := cursor.Decode(&result); err != nil {
 			return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 		}
-		results[result.Date] = result.TotalAmount
+		results[result.Type] = result.TotalAmount
 	}
 
 	return handleResponse(c, &echo.Map{"data": results}, "success", http.StatusOK)
