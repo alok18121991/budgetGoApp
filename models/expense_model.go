@@ -23,3 +23,10 @@ func SetNewExpenseId(expense *Expense) Expense {
 	expense.CreatedDate = time.Now()
 	return *expense
 }
+
+func UpdateExpenseDateTimeToCurrent(expense *Expense) {
+	currentTime := time.Now()
+	date := expense.ExpenseDate
+	updatedDate := time.Date(date.Year(), date.Month(), date.Day(), currentTime.Hour(), currentTime.Minute(), currentTime.Second(), currentTime.Nanosecond(), time.Local)
+	expense.ExpenseDate = updatedDate
+}

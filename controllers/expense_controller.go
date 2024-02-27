@@ -38,6 +38,7 @@ func CreateExpense(c echo.Context) error {
 	}
 
 	newExpense := models.SetNewExpenseId(&expense)
+	models.UpdateExpenseDateTimeToCurrent(&newExpense)
 
 	result, err := expenseCollection.InsertOne(ctx, newExpense)
 	if err != nil {
@@ -56,6 +57,7 @@ func GetAllExpenseForUser(c echo.Context) error {
 	var expenses []models.Expense
 	userId := c.Param("userId")
 	limitString := c.Param("limit")
+	sortKey := c.Param("sortKey")
 	limit, err := strconv.Atoi(limitString)
 	if err != nil {
 		limit = 5
@@ -64,9 +66,9 @@ func GetAllExpenseForUser(c echo.Context) error {
 
 	var optionsParam *options.FindOptions
 	if limit > 0 {
-		optionsParam = options.Find().SetSort(bson.D{{Key: "expenseDate", Value: -1}}).SetLimit(int64(limit))
+		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}}).SetLimit(int64(limit))
 	} else {
-		optionsParam = options.Find().SetSort(bson.D{{Key: "expenseDate", Value: -1}})
+		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}})
 	}
 
 	results, err := expenseCollection.Find(ctx, bson.M{"user_id": userId}, optionsParam)
@@ -112,7 +114,7 @@ func DeleteExpense(c echo.Context) error {
 	return handleResponse(c, &echo.Map{"data": deleteResult}, "success", http.StatusOK)
 }
 
-func GetExpenseGroupByDate(c echo.Context) error {
+func GetExpenseGroupByType(c echo.Context) error {
 	userIDsString := c.QueryParam("userids")
 	numMonthsString := c.QueryParam("numMonths")
 	groupType := c.QueryParam("groupType")
