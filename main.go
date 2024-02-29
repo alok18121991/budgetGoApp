@@ -28,6 +28,7 @@ func main() {
 
 	routes.UserRoute(e)
 	routes.ExpenseRoute(e)
+	routes.GroupRoute(e)
 	configs.ConnectMongoDB()
 
 	fmt.Println("app env :", getEnv(APP_ENV))
