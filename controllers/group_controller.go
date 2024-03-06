@@ -5,6 +5,7 @@ import (
 	"alok/web-service-budget/models"
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -194,4 +195,89 @@ func GetGroupDetailsHandler(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, group)
+}
+
+// GetActiveGroupDetailsHandler returns details of active groups from an array of group IDs
+func GetActiveGroupDetailsHandler(c echo.Context) error {
+	ctx := context.TODO()
+
+	// Parse group IDs from request query parameter
+	groupIDs := c.QueryParam("group_ids")
+	if groupIDs == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "group IDs are required")
+	}
+
+	// Split the group IDs string by comma to get individual IDs
+	ids := strings.Split(groupIDs, ",")
+	if len(ids) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid group IDs")
+	}
+
+	// Convert group IDs string array to ObjectID array
+	var objIDs []primitive.ObjectID
+	for _, id := range ids {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "invalid group ID format")
+		}
+		objIDs = append(objIDs, objID)
+	}
+
+	// Define pipeline to lookup user details for each owner ID in the group
+	pipeline := bson.A{
+		bson.M{
+			"$match": bson.M{"_id": bson.M{"$in": objIDs}, "isActive": true},
+		},
+		bson.M{
+			"$lookup": bson.M{
+				"from":         "user",
+				"localField":   "owners",
+				"foreignField": "_id",
+				"as":           "owners",
+			},
+		},
+		bson.M{
+			"$project": bson.M{
+				"id":   "$_id",
+				"name": 1,
+				"owners": bson.M{
+					"$map": bson.M{
+						"input": "$owners",
+						"as":    "owner",
+						"in": bson.M{
+							"id":        "$$owner._id",
+							"firstName": "$$owner.firstName",
+							"lastName":  "$$owner.lastName",
+						},
+					},
+				},
+				"createdDate": 1,
+				"updatedOn":   1,
+				"isActive":    1,
+			},
+		},
+	}
+
+	// Execute aggregation pipeline
+	cursor, err := groupCollection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch group details")
+	}
+	defer cursor.Close(ctx)
+
+	// Collect group details with user details
+	var groupDetails []models.GroupResponse
+	for cursor.Next(ctx) {
+		var group models.GroupResponse
+		if err := cursor.Decode(&group); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to decode group details")
+		}
+		groupDetails = append(groupDetails, group)
+	}
+	if err := cursor.Err(); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to iterate over group details")
+	}
+
+	// Return the details of active groups with user details
+	return c.JSON(http.StatusOK, groupDetails)
 }

@@ -9,7 +9,7 @@ import (
 func ExpenseRoute(e *echo.Echo) {
 	e.POST("/expense", controllers.CreateExpense)
 	e.GET("/expense/:id", controllers.GetExpense)
-	e.GET("/expense/:userId/:sortKey/:limit", controllers.GetAllExpenseForUser)
+	e.GET("/expense/:userId/:sortKey/:limit/:numMonth", controllers.GetAllExpenseForUser)
 	e.GET("/expense/daily", controllers.GetExpenseGroupByType)
 	e.DELETE("/expense/:id", controllers.DeleteExpense)
 	e.DELETE("expense/all", controllers.DeleteAllExpense)

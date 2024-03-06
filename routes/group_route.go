@@ -11,5 +11,5 @@ func GroupRoute(e *echo.Echo) {
 	e.POST("/group/add-owners", controllers.AddOwnersToGroupHandler)
 	e.POST("/group/mark-inactive", controllers.MarkGroupInactiveHandler)
 	e.GET("/group/:id", controllers.GetGroupDetailsHandler)
-
+	e.GET("/groups", controllers.GetActiveGroupDetailsHandler)
 }

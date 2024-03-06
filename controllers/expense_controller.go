@@ -58,6 +58,7 @@ func GetAllExpenseForUser(c echo.Context) error {
 	userId := c.Param("userId")
 	limitString := c.Param("limit")
 	sortKey := c.Param("sortKey")
+	numMonths := c.Param("numMonth")
 	limit, err := strconv.Atoi(limitString)
 	if err != nil {
 		limit = 5
@@ -71,7 +72,14 @@ func GetAllExpenseForUser(c echo.Context) error {
 		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}})
 	}
 
-	results, err := expenseCollection.Find(ctx, bson.M{"user_id": userId}, optionsParam)
+	months, _ := strconv.Atoi(numMonths)
+	startOfMonth, endOfMonth := getStartEndDateFromMonthCount(months)
+
+	results, err := expenseCollection.Find(ctx, bson.M{
+		"user_id": userId, "expenseDate": bson.M{
+			"$gte": startOfMonth,
+			"$lt":  endOfMonth,
+		}}, optionsParam)
 
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
@@ -145,16 +153,10 @@ func GetExpenseGroupByType(c echo.Context) error {
 		userIDs[i] = strings.TrimSpace(userID)
 	}
 
-	currentDate := time.Now()
-	currentMonth := currentDate.Month()
-	currentYear := currentDate.Year()
-
 	// Define the start and end of the current month
-	startOfCurrentMonth := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, time.UTC)
 	// Get the month from the current date
-	startOfMonth := startOfCurrentMonth.AddDate(0, -numMonths+1, 0) // Subtract numMonths-1 months
-	startOfMonth = time.Date(startOfMonth.Year(), startOfMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
-	endOfMonth := currentDate.AddDate(0, 1, 0).Add(-time.Nanosecond) // End of current month
+	// Subtract numMonths-1 months
+	startOfMonth, endOfMonth := getStartEndDateFromMonthCount(numMonths) // End of current month
 
 	filter := bson.M{
 		"user_id": bson.M{"$in": userIDs},
@@ -213,6 +215,19 @@ func GetExpenseGroupByType(c echo.Context) error {
 	}
 
 	return handleResponse(c, &echo.Map{"data": results}, "success", http.StatusOK)
+}
+
+func getStartEndDateFromMonthCount(numMonths int) (time.Time, time.Time) {
+	currentDate := time.Now()
+	currentMonth := currentDate.Month()
+	currentYear := currentDate.Year()
+
+	startOfCurrentMonth := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, time.UTC)
+
+	startOfMonth := startOfCurrentMonth.AddDate(0, -numMonths+1, 0)
+	startOfMonth = time.Date(startOfMonth.Year(), startOfMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endOfMonth := currentDate.AddDate(0, 1, 0).Add(-time.Nanosecond)
+	return startOfMonth, endOfMonth
 }
 
 func validateRequest(userIDsString string, c echo.Context, numMonthsString string) (int, bool, error) {
