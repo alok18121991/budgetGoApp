@@ -241,3 +241,100 @@ func validateRequest(userIDsString string, c echo.Context, numMonthsString strin
 	}
 	return numMonths, false, nil
 }
+
+func GetAllExpenseForGroupUsers(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Parse query parameters
+	groupId := c.QueryParam("groupId")
+	userIDsString := c.QueryParam("userIds")
+	limitString := c.QueryParam("limit")
+	sortKey := c.QueryParam("sortKey")
+	numMonthsString := c.QueryParam("numMonth")
+
+	// Default limit to 5 if not provided or invalid
+	limit, err := strconv.Atoi(limitString)
+	if err != nil || limit < 0 {
+		limit = 5
+	}
+
+	// Parse user IDs
+	userIDs := strings.Split(userIDsString, ",")
+	for i, userID := range userIDs {
+		userIDs[i] = strings.TrimSpace(userID)
+	}
+
+	// Calculate start and end dates based on number of months
+	months, _ := strconv.Atoi(numMonthsString)
+	startOfMonth, endOfMonth := getStartEndDateFromMonthCount(months)
+
+	// Define options for MongoDB query
+	var optionsParam *options.FindOptions
+	if limit > 0 {
+		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}}).SetLimit(int64(limit))
+	} else {
+		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}})
+	}
+
+	filter, shouldReturn, returnValue := getFiltersFromParams(groupId, userIDs, startOfMonth, endOfMonth, userIDsString, c)
+	if shouldReturn {
+		return returnValue
+	}
+
+	// Execute MongoDB query
+
+	results, err := expenseCollection.Find(ctx, filter, optionsParam)
+	if err != nil {
+		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
+	}
+	defer results.Close(ctx)
+
+	// Decode results and store in expenses slice
+	var expenses []models.Expense
+	for results.Next(ctx) {
+		var expense models.Expense
+		if err := results.Decode(&expense); err != nil {
+			return c.JSON(http.StatusInternalServerError, responses.GenericResponse{
+				Status:  http.StatusInternalServerError,
+				Message: "error",
+				Data:    &echo.Map{"data": err.Error()},
+			})
+		}
+		expenses = append(expenses, expense)
+	}
+
+	return handleResponse(c, &echo.Map{"data": expenses}, "success", http.StatusOK)
+
+}
+
+func getFiltersFromParams(groupId string, userIDs []string, startOfMonth time.Time, endOfMonth time.Time, userIDsString string, c echo.Context) (primitive.M, bool, error) {
+	var filter bson.M
+	if groupId == "" {
+		filter = bson.M{
+			"user_id":     bson.M{"$in": userIDs},
+			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
+		}
+
+	} else if userIDsString == "" {
+		objID, err := primitive.ObjectIDFromHex(groupId)
+		if err != nil {
+			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
+		}
+		filter = bson.M{
+			"group_id":    objID,
+			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
+		}
+	} else {
+		objID, err := primitive.ObjectIDFromHex(groupId)
+		if err != nil {
+			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
+		}
+		filter = bson.M{
+			"user_id":     bson.M{"$in": userIDs},
+			"group_id":    objID,
+			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
+		}
+	}
+	return filter, false, nil
+}

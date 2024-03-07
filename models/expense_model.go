@@ -16,6 +16,7 @@ type Expense struct {
 	ExpenseDate    time.Time          `bson:"expenseDate" json:"expenseDate"`
 	Description    string             `bson:"description" json:"description" validate:"required"`
 	Source         string             `bson:"source" json:"source" validate:"required"`
+	Group          primitive.ObjectID `bson:"group_id" json:"group" validate:"required"`
 }
 
 func SetNewExpenseId(expense *Expense) Expense {
