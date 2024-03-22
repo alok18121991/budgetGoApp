@@ -13,6 +13,6 @@ func ExpenseRoute(e *echo.Echo) {
 	e.GET("/expense/group", controllers.GetAllExpenseForGroupUsers)
 	e.GET("/expense/daily", controllers.GetExpenseGroupByType)
 	e.DELETE("/expense/:id", controllers.DeleteExpense)
-	e.DELETE("expense/all", controllers.DeleteAllExpense)
+	// e.DELETE("expense/all", controllers.DeleteAllExpense)
 
 }

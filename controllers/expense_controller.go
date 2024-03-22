@@ -123,6 +123,7 @@ func DeleteExpense(c echo.Context) error {
 }
 
 func GetExpenseGroupByType(c echo.Context) error {
+	groupId := c.QueryParam("groupId")
 	userIDsString := c.QueryParam("userids")
 	numMonthsString := c.QueryParam("numMonths")
 	groupType := c.QueryParam("groupType")
@@ -158,13 +159,18 @@ func GetExpenseGroupByType(c echo.Context) error {
 	// Subtract numMonths-1 months
 	startOfMonth, endOfMonth := getStartEndDateFromMonthCount(numMonths) // End of current month
 
-	filter := bson.M{
-		"user_id": bson.M{"$in": userIDs},
-		"expenseDate": bson.M{
-			"$gte": startOfMonth,
-			"$lt":  endOfMonth,
-		},
+	filter, shouldReturn, returnValue := getFiltersFromParams(groupId, userIDs, userIDsString, startOfMonth, endOfMonth, c)
+	if shouldReturn {
+		return returnValue
 	}
+
+	// filter := bson.M{
+	// 	"user_id": bson.M{"$in": userIDs},
+	// 	"expenseDate": bson.M{
+	// 		"$gte": startOfMonth,
+	// 		"$lt":  endOfMonth,
+	// 	},
+	// }
 
 	// Define the group field based on the groupType parameter
 	var groupField interface{}
@@ -277,11 +283,15 @@ func GetAllExpenseForGroupUsers(c echo.Context) error {
 		optionsParam = options.Find().SetSort(bson.D{{Key: sortKey, Value: -1}})
 	}
 
-	filter, shouldReturn, returnValue := getFiltersFromParams(groupId, userIDs, startOfMonth, endOfMonth, userIDsString, c)
+	filter, shouldReturn, returnValue := getFiltersFromParams(groupId, userIDs, userIDsString, startOfMonth, endOfMonth, c)
 	if shouldReturn {
 		return returnValue
 	}
 
+	fmt.Print("booooll... ", len(userIDs) == 0)
+	fmt.Println("filtersss444...", groupId, userIDs, startOfMonth, endOfMonth)
+	fmt.Println("filtersss...", filter)
+	fmt.Println("-------------------------------")
 	// Execute MongoDB query
 
 	results, err := expenseCollection.Find(ctx, filter, optionsParam)
@@ -308,15 +318,17 @@ func GetAllExpenseForGroupUsers(c echo.Context) error {
 
 }
 
-func getFiltersFromParams(groupId string, userIDs []string, startOfMonth time.Time, endOfMonth time.Time, userIDsString string, c echo.Context) (primitive.M, bool, error) {
+func getFiltersFromParams(groupId string, userIDs []string, userIDsString string, startOfMonth time.Time, endOfMonth time.Time, c echo.Context) (primitive.M, bool, error) {
 	var filter bson.M
 	if groupId == "" {
+		fmt.Println("in group........")
 		filter = bson.M{
 			"user_id":     bson.M{"$in": userIDs},
 			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
 		}
 
 	} else if userIDsString == "" {
+		fmt.Println("in user........")
 		objID, err := primitive.ObjectIDFromHex(groupId)
 		if err != nil {
 			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
@@ -326,6 +338,7 @@ func getFiltersFromParams(groupId string, userIDs []string, startOfMonth time.Ti
 			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
 		}
 	} else {
+		fmt.Println("in default........")
 		objID, err := primitive.ObjectIDFromHex(groupId)
 		if err != nil {
 			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
