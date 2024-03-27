@@ -13,10 +13,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var userCollection *mongo.Collection = configs.GetCollection(configs.DB, "user")
+// var configs.UserCollection *mongo.Collection = configs.GetCollection(configs.DB, "user")
 var validate = validator.New()
 
 func CreateUser(c echo.Context) error {
@@ -38,7 +37,7 @@ func CreateUser(c echo.Context) error {
 
 	newUser := models.SetNewUserId(&user)
 
-	result, err := userCollection.InsertOne(ctx, newUser)
+	result, err := configs.UserCollection.InsertOne(ctx, newUser)
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
 	}
@@ -53,7 +52,21 @@ func GetUser(c echo.Context) error {
 	defer cancel()
 
 	objId, _ := primitive.ObjectIDFromHex(userId)
-	err := userCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+	err := configs.UserCollection.FindOne(ctx, bson.M{"_id": objId}).Decode(&user)
+	if err != nil {
+		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
+	}
+	return handleResponse(c, &echo.Map{"data": user}, "success", http.StatusOK)
+
+}
+
+func GetUserByEmail(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	email := c.Param("emailId")
+	var user models.User
+	defer cancel()
+
+	err := configs.UserCollection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 	}
@@ -66,7 +79,7 @@ func GetAllUsers(c echo.Context) error {
 	var users []models.User
 	defer cancel()
 
-	results, err := userCollection.Find(ctx, bson.M{})
+	results, err := configs.UserCollection.Find(ctx, bson.M{})
 
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, responses.GenericResponse{Status: http.StatusInternalServerError, Message: "error", Data: &echo.Map{"data": err.Error()}})
@@ -90,7 +103,7 @@ func DeleteAllUser(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	deleteResult, err := userCollection.DeleteMany(ctx, bson.M{})
+	deleteResult, err := configs.UserCollection.DeleteMany(ctx, bson.M{})
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 	}

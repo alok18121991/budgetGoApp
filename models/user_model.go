@@ -19,6 +19,11 @@ type User struct {
 	Groups       []primitive.ObjectID `bson:"groups,omitempty" json:"groups,omitempty"`
 }
 
+// Error implements error.
+func (u User) Error() string {
+	panic("unimplemented")
+}
+
 func SetNewUserId(user *User) User {
 	user.Id = primitive.NewObjectID()
 	user.CreatedDate = time.Now()

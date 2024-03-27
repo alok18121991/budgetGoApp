@@ -18,8 +18,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var expenseCollection *mongo.Collection = configs.GetCollection(configs.DB, "expenses")
-
 func CreateExpense(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	var expense models.Expense
@@ -40,7 +38,7 @@ func CreateExpense(c echo.Context) error {
 	newExpense := models.SetNewExpenseId(&expense)
 	models.UpdateExpenseDateTimeToCurrent(&newExpense)
 
-	result, err := expenseCollection.InsertOne(ctx, newExpense)
+	result, err := configs.ExpenseCollection.InsertOne(ctx, newExpense)
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
 	}
@@ -75,7 +73,7 @@ func GetAllExpenseForUser(c echo.Context) error {
 	months, _ := strconv.Atoi(numMonths)
 	startOfMonth, endOfMonth := getStartEndDateFromMonthCount(months)
 
-	results, err := expenseCollection.Find(ctx, bson.M{
+	results, err := configs.ExpenseCollection.Find(ctx, bson.M{
 		"user_id": userId, "expenseDate": bson.M{
 			"$gte": startOfMonth,
 			"$lt":  endOfMonth,
@@ -102,7 +100,7 @@ func DeleteAllExpense(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	deleteResult, err := expenseCollection.DeleteMany(ctx, bson.M{})
+	deleteResult, err := configs.ExpenseCollection.DeleteMany(ctx, bson.M{})
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 	}
@@ -115,7 +113,7 @@ func DeleteExpense(c echo.Context) error {
 	defer cancel()
 
 	expenseId, _ := primitive.ObjectIDFromHex(id)
-	deleteResult, err := expenseCollection.DeleteOne(ctx, bson.M{"_id": expenseId})
+	deleteResult, err := configs.ExpenseCollection.DeleteOne(ctx, bson.M{"_id": expenseId})
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 	}
@@ -200,7 +198,7 @@ func GetExpenseGroupByType(c echo.Context) error {
 	}
 
 	// Execute the aggregation pipeline
-	cursor, err := expenseCollection.Aggregate(context.Background(), pipeline)
+	cursor, err := configs.ExpenseCollection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusInternalServerError)
 	}
@@ -288,13 +286,13 @@ func GetAllExpenseForGroupUsers(c echo.Context) error {
 		return returnValue
 	}
 
-	fmt.Print("booooll... ", len(userIDs) == 0)
-	fmt.Println("filtersss444...", groupId, userIDs, startOfMonth, endOfMonth)
-	fmt.Println("filtersss...", filter)
-	fmt.Println("-------------------------------")
+	// fmt.Print("booooll... ", len(userIDs) == 0)
+	// fmt.Println("filtersss444...", groupId, userIDs, startOfMonth, endOfMonth)
+	// fmt.Println("filtersss...", filter)
+	// fmt.Println("-------------------------------")
 	// Execute MongoDB query
 
-	results, err := expenseCollection.Find(ctx, filter, optionsParam)
+	results, err := configs.ExpenseCollection.Find(ctx, filter, optionsParam)
 	if err != nil {
 		return handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
 	}
@@ -321,14 +319,12 @@ func GetAllExpenseForGroupUsers(c echo.Context) error {
 func getFiltersFromParams(groupId string, userIDs []string, userIDsString string, startOfMonth time.Time, endOfMonth time.Time, c echo.Context) (primitive.M, bool, error) {
 	var filter bson.M
 	if groupId == "" {
-		fmt.Println("in group........")
 		filter = bson.M{
 			"user_id":     bson.M{"$in": userIDs},
 			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
 		}
 
 	} else if userIDsString == "" {
-		fmt.Println("in user........")
 		objID, err := primitive.ObjectIDFromHex(groupId)
 		if err != nil {
 			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)
@@ -338,7 +334,6 @@ func getFiltersFromParams(groupId string, userIDs []string, userIDsString string
 			"expenseDate": bson.M{"$gte": startOfMonth, "$lt": endOfMonth},
 		}
 	} else {
-		fmt.Println("in default........")
 		objID, err := primitive.ObjectIDFromHex(groupId)
 		if err != nil {
 			return nil, true, handleResponse(c, &echo.Map{"data": err.Error()}, "error", http.StatusBadRequest)

@@ -26,9 +26,11 @@ func main() {
 		}))
 	}
 
+	e.Use(configs.JWTMiddleware)
 	routes.UserRoute(e)
 	routes.ExpenseRoute(e)
 	routes.GroupRoute(e)
+	routes.AuthRRoute(e)
 	configs.ConnectMongoDB()
 
 	fmt.Println("app env :", getEnv(APP_ENV))

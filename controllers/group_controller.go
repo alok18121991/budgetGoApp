@@ -14,8 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var groupCollection *mongo.Collection = configs.GetCollection(configs.DB, "group")
-
 func CreateGroupHandler(c echo.Context) error {
 	// Parse request body into Group struct
 	group := new(models.Group)
@@ -50,7 +48,7 @@ func CreateGroupHandler(c echo.Context) error {
 	}
 
 	// Insert group document
-	_, err = groupCollection.InsertOne(context.Background(), group)
+	_, err = configs.GroupCollection.InsertOne(context.Background(), group)
 	if err != nil {
 		c.Echo().Logger.Error(err.Error())
 		session.AbortTransaction(context.Background())
@@ -60,7 +58,7 @@ func CreateGroupHandler(c echo.Context) error {
 	for _, userID := range group.Owners {
 		filter := bson.M{"_id": userID}
 		update := bson.M{"$addToSet": bson.M{"groups": group.ID}}
-		_, err := userCollection.UpdateOne(context.Background(), filter, update)
+		_, err := configs.UserCollection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
 			c.Echo().Logger.Error(err.Error())
 			session.AbortTransaction(context.Background())
@@ -115,7 +113,7 @@ func AddOwnersToGroupHandler(c echo.Context) error {
 	}
 
 	// Perform update operation
-	_, err = groupCollection.UpdateOne(context.Background(), filter, update)
+	_, err = configs.GroupCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		session.AbortTransaction(context.Background())
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update group")
@@ -124,7 +122,7 @@ func AddOwnersToGroupHandler(c echo.Context) error {
 	for _, userID := range request.Owners {
 		filter := bson.M{"_id": userID}
 		update := bson.M{"$addToSet": bson.M{"groups": request.GroupID}}
-		_, err := userCollection.UpdateOne(context.Background(), filter, update)
+		_, err := configs.UserCollection.UpdateOne(context.Background(), filter, update)
 		if err != nil {
 			c.Echo().Logger.Error(err.Error())
 			session.AbortTransaction(context.Background())
@@ -160,7 +158,7 @@ func MarkGroupInactiveHandler(c echo.Context) error {
 		"$set": bson.M{"isActive": false, "updatedOn": time.Now()},
 	}
 
-	_, err := groupCollection.UpdateOne(context.Background(), filter, update)
+	_, err := configs.GroupCollection.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		c.Echo().Logger.Error(err.Error())
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to mark group as inactive")
@@ -184,7 +182,7 @@ func GetGroupDetailsHandler(c echo.Context) error {
 	}
 
 	var group models.Group
-	err = groupCollection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&group)
+	err = configs.GroupCollection.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&group)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			c.Echo().Logger.Error(err.Error())
@@ -259,7 +257,7 @@ func GetActiveGroupDetailsHandler(c echo.Context) error {
 	}
 
 	// Execute aggregation pipeline
-	cursor, err := groupCollection.Aggregate(ctx, pipeline)
+	cursor, err := configs.GroupCollection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch group details")
 	}
